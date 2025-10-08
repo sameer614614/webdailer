@@ -89,6 +89,20 @@ npm run build
 
 ## Firebase security rules
 
+The repository ships with locked-down security policies you can deploy directly to your Firebase project:
+
+- **Firestore** – `firebase/firestore.rules`
+  - Only the authenticated owner of a document can read or write their `users/{uid}` document and the nested `sipProfiles` and `callLogs` sub-collections.
+- **Realtime Database** – `firebase/database.rules.json`
+  - Authenticated agents can read presence information for all users, but may only write to their own `status/{uid}` node.
+
+Deploy the rules after updating your Firebase CLI project alias:
+
+```bash
+firebase deploy --only firestore:rules,database:rules
+```
+
+Adjust the rules if you introduce additional collections or Realtime Database paths.
 Ensure you configure Firestore and Realtime Database rules to restrict access to authenticated users. Sample rules are outside the scope of this repository and should be customized for your deployment.
 
 ## Deployment
