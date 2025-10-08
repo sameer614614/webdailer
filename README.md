@@ -1,17 +1,100 @@
-i saw microSIP for desktop to connecting sip acocunts for call center agents they config microsip with their own SIP providers like telnyx or any when agent can suse SIP that develop  in  astertisk type server, this is for desktop, 
-for phone we have Softphone by acrobits, PortSIP for Android / IOS 
+# WebDialer
 
-but i didnt found any easy to use Web SIP Dailer so anyone can signup then add multiple profiles of sip, when calling user can top header showing which sip you are using for this call, tap to chnage option to select another sip, also on dailer show status by caller of SIp like same as Softphone Acrobits
+A modern web-based multi-SIP dialer built with Vite, React, TypeScript, Tailwind CSS, and Firebase. Agents can authenticate, manage multiple SIP profiles, monitor registration status, and place calls directly from the browser using a JsSIP-powered softphone.
 
-i want you completely build this Web Dailer and  we will host it into firebase hosting, database we will firebase firestore, auth, rtdb, 
-my suggestions: i want in vite js / ts shadcn + tailwindcss for modern look
-but you can give more better languages suggestions for smoothness and fast respone,
+## Features
 
+- Firebase Authentication with email/password and Google provider
+- Firestore-backed SIP profile management with validation
+- Real-time presence tracking with Firebase Realtime Database
+- JsSIP-based WebRTC calling with status feedback and call controls
+- Call history persisted to Firestore
+- Responsive UI using Tailwind CSS with shadcn-inspired components
 
-now start your magic and give codes starting setting vite on local i want complete fullly funcational code, because you are ULTRA verison of Gemini, show how you satisfy, dont experiments or beta testing on me please, 
+## Getting started
 
-Start now
+### Prerequisites
 
-before coding you have give full detailed information how you work, services we needed, classes, languegges, flow daigram, then i like it then give you go a head to start finish it in a day,
-for ULTRA Gemini this is just a small project, 
-proove it 
+- Node.js 20+
+- npm 10+
+- Firebase project with Authentication, Firestore, Realtime Database, and Functions enabled
+- SIP infrastructure that supports WebSocket (WSS/WS) connections
+
+### Setup
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Configure environment variables by copying `.env.example` to `.env` and providing your Firebase project settings and optional emulator overrides:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+   The app will be available at [http://localhost:5173](http://localhost:5173).
+
+### Testing & quality checks
+
+Run linting and type checks before you push code:
+
+```bash
+npm run lint
+npm run typecheck
+```
+
+Build the production bundle to make sure the app compiles cleanly:
+
+```bash
+npm run build
+```
+
+### Local development workflow
+
+During feature work use the dev server for a live-reload experience:
+
+```bash
+npm run dev
+```
+
+### Pushing your changes
+
+1. Verify the checks above pass.
+2. Commit your work:
+
+   ```bash
+   git add .
+   git commit -m "feat: describe your change"
+   ```
+
+3. Push to your remote repository:
+
+   ```bash
+   git push origin <your-branch-name>
+   ```
+
+### Building for production
+
+```bash
+npm run build
+```
+
+## Firebase security rules
+
+Ensure you configure Firestore and Realtime Database rules to restrict access to authenticated users. Sample rules are outside the scope of this repository and should be customized for your deployment.
+
+## Deployment
+
+The app is optimized for static hosting platforms such as Firebase Hosting. After running `npm run build`, deploy the generated files in the `dist/` directory.
+
+## License
+
+MIT
