@@ -11,6 +11,10 @@ A modern web-based multi-SIP dialer built with Vite, React, TypeScript, Tailwind
 - Call history persisted to Firestore
 - Profile-level activity stream for registration and call errors
 - Primary profile selection that persists across sessions
+- Firestore-backed SIP profile management with validation
+- Real-time presence tracking with Firebase Realtime Database
+- JsSIP-based WebRTC calling with status feedback and call controls
+- Call history persisted to Firestore
 - Responsive UI using Tailwind CSS with shadcn-inspired components
 
 ## Getting started
@@ -83,28 +87,6 @@ npm run dev
    git push origin <your-branch-name>
    ```
 
-### Handling merge conflicts in pull requests
-
-If GitHub reports conflicts while you are pulling the latest changes, prefer a
-single source of truth instead of "Accept both". Choosing both versions keeps
-duplicated imports or variable declarations, which causes the TypeScript parser
-errors you may have seen (for example, "Identifier 'profiles' has already been
-declared"). When you are updating an existing pull request:
-
-1. Start with your local branch checked out and up to date with your latest
-   commits.
-2. Fetch the upstream branch (`git fetch origin main`) and rebase or merge onto
-   it.
-3. When the conflict editor opens, pick **Accept Incoming Change** to keep the
-   code that already exists in `main`, unless you intentionally need to keep
-   your version.
-4. Resolve each conflict, run `npm run lint`, `npm run typecheck`, and
-   `npm run build` to confirm the code compiles, then commit the resolved
-   result.
-
-This workflow keeps the project consistent across the earlier pull requests and
-prevents duplicated blocks from sneaking into the TypeScript files.
-
 ### Building for production
 
 ```bash
@@ -137,6 +119,8 @@ Adjust the rules if you introduce additional collections or Realtime Database pa
 Telnyx agents only need to supply their SIP username, password, and domain. The app automatically fills the secure WebSocket URL, transport, registrar, and default port (`wss://sip.telnyx.com:443`). Toggle the advanced overrides if you need to customise WSS, transport, registrar, or outbound proxy details for non-Telnyx providers.
 
 Mark any profile as **Primary** so it auto-registers on login and becomes the default choice in the header selector. Profile labels must be unique; edit or delete entries directly from the dashboard list.
+Adjust the rules if you introduce additional collections or Realtime Database paths.
+Ensure you configure Firestore and Realtime Database rules to restrict access to authenticated users. Sample rules are outside the scope of this repository and should be customized for your deployment.
 
 ## Deployment
 

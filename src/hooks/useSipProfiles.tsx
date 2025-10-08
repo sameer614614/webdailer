@@ -1,15 +1,11 @@
 import { nanoid } from "nanoid";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { onSnapshot, query, collection, doc, setDoc, writeBatch } from "firebase/firestore";
+import { onSnapshot, query, collection, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { firestore } from "../lib/firebase";
 import { useAuth } from "./useAuth";
 import { type SipProfile } from "../types/sip";
 import { z } from "zod";
-import {
-  TELNYX_DEFAULT_DOMAIN,
-  TELNYX_DEFAULT_PORT,
-  getTelnyxWebsocketUrl,
-} from "../constants/telnyx";
 
 const sipProfileSchema = z.object({
   id: z.string(),
@@ -31,18 +27,20 @@ const sipProfileSchema = z.object({
   updatedAt: z.string().optional(),
 });
 
+const TELNYX_DEFAULT_DOMAIN = "sip.telnyx.com";
+
 const applyProviderDefaults = (profile: SipProfile): SipProfile => {
   if (profile.provider !== "telnyx") {
     return profile;
   }
 
   const domain = profile.domain?.trim() || TELNYX_DEFAULT_DOMAIN;
-  const websocketUrl = profile.websocketUrl?.trim() || getTelnyxWebsocketUrl(domain);
+  const websocketUrl = profile.websocketUrl?.trim() || `wss://${domain}:443`;
 
   return {
     ...profile,
     transport: "wss",
-    port: profile.port ?? TELNYX_DEFAULT_PORT,
+    port: profile.port ?? 443,
     websocketUrl,
     registrar: profile.registrar?.trim() || domain,
     outboundProxy: profile.outboundProxy?.trim() || undefined,
@@ -60,6 +58,13 @@ const normalizeProfile = (profile: SipProfile): SipProfile => {
   };
   return applyProviderDefaults(base);
 };
+
+  outboundProxy: z.string().optional(),
+  registrar: z.string().optional(),
+  displayName: z.string().optional(),
+  voicemailNumber: z.string().optional(),
+  autoRegister: z.boolean().optional(),
+});
 
 type SipProfilesContextValue = {
   profiles: SipProfile[];
@@ -88,6 +93,7 @@ export const SipProfilesProvider = ({ children }: { children: ReactNode }) => {
       const data = snapshot.docs
         .map((docSnap) => normalizeProfile(docSnap.data() as SipProfile))
         .sort((a, b) => Number(b.isPrimary ?? false) - Number(a.isPrimary ?? false));
+      const data = snapshot.docs.map((docSnap) => docSnap.data() as SipProfile);
       setProfiles(data);
       setLoading(false);
     });
@@ -130,6 +136,10 @@ export const SipProfilesProvider = ({ children }: { children: ReactNode }) => {
           });
       }
       await batch.commit();
+      const id = nanoid();
+      const data: SipProfile = { id, ...profile };
+      sipProfileSchema.parse(data);
+      await setDoc(doc(firestore, `users/${user.uid}/sipProfiles/${id}`), data);
     },
     updateProfile: async (id, profile) => {
       if (!user) throw new Error("Not authenticated");
@@ -188,6 +198,13 @@ export const SipProfilesProvider = ({ children }: { children: ReactNode }) => {
           batch.set(doc(firestore, `users/${user.uid}/sipProfiles/${item.id}`), { isPrimary: false, updatedAt: timestamp }, { merge: true });
         });
       await batch.commit();
+      const updated = { ...existing, ...profile } as SipProfile;
+      sipProfileSchema.parse(updated);
+      await setDoc(doc(firestore, `users/${user.uid}/sipProfiles/${id}`), updated, { merge: true });
+    },
+    removeProfile: async (id) => {
+      if (!user) throw new Error("Not authenticated");
+      await deleteDoc(doc(firestore, `users/${user.uid}/sipProfiles/${id}`));
     },
   }), [profiles, loading, user]);
 
