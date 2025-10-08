@@ -1,10 +1,14 @@
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { type SipProfile, type SipTransport } from "../../types/sip";
-import { TELNYX_DEFAULT_DOMAIN, TELNYX_DEFAULT_PORT, getTelnyxWebsocketUrl } from "../../constants/telnyx";
-import { normalizeSipDomain } from "../../utils/sip";
+import {
+  TELNYX_DEFAULT_DOMAIN,
+  TELNYX_DEFAULT_PORT,
+  getTelnyxWebsocketUrl,
+} from "../../constants/telnyx";
 
 interface SipProfileFormProps {
   onSubmit: (profile: Omit<SipProfile, "id">) => Promise<void>;
@@ -20,7 +24,7 @@ const emptyProfile: Omit<SipProfile, "id"> = {
   label: "",
   username: "",
   password: "",
-  domain: TELNYX_DEFAULT_DOMAIN,
+  domain: "",
   transport: "wss",
   provider: "telnyx",
   port: undefined,
@@ -33,31 +37,6 @@ const emptyProfile: Omit<SipProfile, "id"> = {
   isPrimary: false,
 };
 
-const buildInitialState = (values?: Partial<SipProfile>): Omit<SipProfile, "id"> => {
-  const { id: _ignored, ...rest } = values ?? {};
-  const base: Omit<SipProfile, "id"> = {
-    ...emptyProfile,
-    ...rest,
-    transport: rest.transport ?? emptyProfile.transport,
-    provider: rest.provider ?? emptyProfile.provider,
-    autoRegister: rest.autoRegister ?? emptyProfile.autoRegister,
-    isPrimary: rest.isPrimary ?? emptyProfile.isPrimary,
-  };
-  if (base.provider === "telnyx") {
-    const trimmedDomain = normalizeSipDomain(base.domain);
-    return {
-      ...base,
-      domain: trimmedDomain,
-      transport: "wss",
-      port: base.port ?? TELNYX_DEFAULT_PORT,
-      websocketUrl: base.websocketUrl?.trim() || getTelnyxWebsocketUrl(trimmedDomain),
-      registrar: base.registrar?.trim() || trimmedDomain,
-      autoRegister: typeof base.autoRegister === "boolean" ? base.autoRegister : true,
-    };
-  }
-  return base;
-};
-
 export const SipProfileForm = ({
   onSubmit,
   submitting,
@@ -65,13 +44,34 @@ export const SipProfileForm = ({
   onCancel,
   submitLabel = "Save profile",
 }: SipProfileFormProps) => {
-  const [formState, setFormState] = useState<Omit<SipProfile, "id">>(() => buildInitialState(initialValues));
+  const [formState, setFormState] = useState<Omit<SipProfile, "id">>({
+    ...emptyProfile,
+    ...initialValues,
+    transport: initialValues?.transport ?? emptyProfile.transport,
+    provider: initialValues?.provider ?? emptyProfile.provider,
+    autoRegister: initialValues?.autoRegister ?? emptyProfile.autoRegister,
+    isPrimary: initialValues?.isPrimary ?? emptyProfile.isPrimary,
+  });
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(
     initialValues?.provider === "custom" || Boolean(initialValues?.websocketUrl || initialValues?.registrar || initialValues?.outboundProxy),
   );
 
-
+export const SipProfileForm = ({ onSubmit, submitting }: SipProfileFormProps) => {
+  const [formState, setFormState] = useState<Omit<SipProfile, "id">>({
+    label: "",
+    username: "",
+    password: "",
+    domain: "",
+    transport: "wss",
+    port: undefined,
+    outboundProxy: "",
+    registrar: "",
+    displayName: "",
+    voicemailNumber: "",
+    autoRegister: true,
+  });
+  const [error, setError] = useState<string | null>(null);
   const handleChange = (field: keyof Omit<SipProfile, "id">) => (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -106,19 +106,15 @@ export const SipProfileForm = ({
     next.websocketUrl = next.websocketUrl?.trim() || undefined;
     next.registrar = next.registrar?.trim() || undefined;
     next.outboundProxy = next.outboundProxy?.trim() || undefined;
-    next.domain = normalizeSipDomain(next.domain);
+    next.domain = next.domain.trim();
     next.label = next.label.trim();
     next.username = next.username.trim();
-    if (next.provider === "telnyx") {
-      const telnyxDomain = normalizeSipDomain(next.domain);
-      next.transport = "wss";
-      next.port = next.port ?? TELNYX_DEFAULT_PORT;
-      next.websocketUrl = next.websocketUrl ?? getTelnyxWebsocketUrl(telnyxDomain);
-      next.registrar = next.registrar ?? telnyxDomain;
-      next.autoRegister = typeof next.autoRegister === "boolean" ? next.autoRegister : true;
-    }
     return next;
   }, [formState]);
+
+      [field]: value === "" ? undefined : value,
+    }));
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -129,9 +125,11 @@ export const SipProfileForm = ({
         transport: sanitizedState.provider === "telnyx" ? "wss" : sanitizedState.transport,
       });
       if (!initialValues) {
-        setFormState(buildInitialState());
+        setFormState({ ...emptyProfile });
         setShowAdvanced(false);
       }
+      await onSubmit(formState);
+      setFormState((prev) => ({ ...prev, label: "", username: "", password: "", domain: "" }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save profile");
     }
@@ -159,30 +157,12 @@ export const SipProfileForm = ({
             value={formState.provider}
             onChange={(event) => {
               const value = event.target.value as SipProfile["provider"];
-              setFormState((prev) => {
-                const next: Omit<SipProfile, "id"> = {
-                  ...prev,
-                  provider: value,
-                  transport: value === "telnyx" ? "wss" : prev.transport,
-                };
-                if (value === "telnyx") {
-                  const trimmedDomain = normalizeSipDomain(prev.domain);
-                  const previousDomain = normalizeSipDomain(prev.domain);
-                  const previousWebsocket = prev.websocketUrl?.trim();
-                  next.domain = trimmedDomain;
-                  next.port = prev.port ?? TELNYX_DEFAULT_PORT;
-                  const defaultWebsocket = getTelnyxWebsocketUrl(trimmedDomain);
-                  if (!previousWebsocket || previousWebsocket === getTelnyxWebsocketUrl(previousDomain)) {
-                    next.websocketUrl = defaultWebsocket;
-                  }
-                  if (!prev.registrar || prev.registrar === prev.domain || prev.registrar === "") {
-                    next.registrar = trimmedDomain;
-                  }
-                  next.autoRegister = typeof prev.autoRegister === "boolean" ? prev.autoRegister : true;
-                }
-                return next;
-              });
-              setShowAdvanced(value === "custom");
+              setFormState((prev) => ({ ...prev, provider: value, transport: value === "telnyx" ? "wss" : prev.transport }));
+              if (value === "telnyx") {
+                setShowAdvanced(false);
+              } else {
+                setShowAdvanced(true);
+              }
             }}
           >
             <option value="telnyx">Telnyx (recommended)</option>
@@ -195,6 +175,12 @@ export const SipProfileForm = ({
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">SIP password</Label>
+        <div className="space-y-2">
+          <Label htmlFor="username">Username</Label>
+          <Input id="username" value={formState.username} onChange={handleChange("username")} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
           <Input
             id="password"
             type="password"
@@ -208,12 +194,53 @@ export const SipProfileForm = ({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="domain">SIP domain</Label>
+          <Input id="domain" value={formState.domain} onChange={handleChange("domain")} required />
+        </div>
+        <div className="space-y-2">
+        <div className="space-y-2">
+          <Label htmlFor="domain">Domain</Label>
+          <Input id="domain" value={formState.domain} onChange={handleChange("domain")} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="port">Port</Label>
           <Input
-            id="domain"
-            placeholder={TELNYX_DEFAULT_DOMAIN}
-            value={formState.domain}
-            onChange={handleChange("domain")}
-            required
+            id="port"
+            type="number"
+            value={formState.port ?? ""}
+            onChange={handleChange("port")}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="transport">Transport</Label>
+          <select
+            id="transport"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            value={formState.transport}
+            onChange={handleChange("transport")}
+          >
+            {transports.map((transport) => (
+              <option key={transport} value={transport}>
+                {transport.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="registrar">Registrar</Label>
+          <Input
+            id="registrar"
+            value={formState.registrar ?? ""}
+            onChange={handleChange("registrar")}
+            placeholder="sip:registrar.example.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="outboundProxy">Outbound proxy</Label>
+          <Input
+            id="outboundProxy"
+            value={formState.outboundProxy ?? ""}
+            onChange={handleChange("outboundProxy")}
+            placeholder="wss://proxy.example.com"
           />
         </div>
         <div className="space-y-2">
@@ -228,10 +255,8 @@ export const SipProfileForm = ({
 
       {formState.provider === "telnyx" ? (
         <div className="rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Telnyx defaults automatically configure secure WebSocket ({
-            getTelnyxWebsocketUrl(normalizeSipDomain(formState.domain))
-          }), registrar ({normalizeSipDomain(formState.domain)}), and WSS transport. Enable advanced overrides
-          below if you need to customise them.
+          Telnyx defaults will automatically configure secure WebSocket, registration server, and transport. Enable advanced
+          overrides below if you need to customise them.
         </div>
       ) : null}
 
@@ -263,13 +288,7 @@ export const SipProfileForm = ({
           </div>
           <div className="space-y-2">
             <Label htmlFor="port">Port</Label>
-            <Input
-              id="port"
-              type="number"
-              placeholder={String(TELNYX_DEFAULT_PORT)}
-              value={formState.port ?? ""}
-              onChange={handleChange("port")}
-            />
+            <Input id="port" type="number" value={formState.port ?? ""} onChange={handleChange("port")} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="websocketUrl">WebSocket URL</Label>
@@ -314,6 +333,15 @@ export const SipProfileForm = ({
             {submitLabel}
           </Button>
         </div>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={Boolean(formState.autoRegister)} onChange={handleChange("autoRegister")} />
+          Auto register on login
+        </label>
+        <Button type="submit" disabled={submitting}>
+          Save profile
+        </Button>
       </div>
     </form>
   );

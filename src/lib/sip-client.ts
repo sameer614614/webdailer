@@ -1,8 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import JsSIP from "jssip";
 import { type SipProfile, type CallState } from "../types/sip";
-import { TELNYX_DEFAULT_COUNTRY_CODE } from "../constants/telnyx";
-import { normalizeSipDomain } from "../utils/sip";
 
 type SipClientEventMap = {
   "registration:change": {
@@ -10,6 +8,7 @@ type SipClientEventMap = {
     error?: string;
     profile?: SipProfile | null;
   };
+  "registration:change": { status: "registering" | "registered" | "unregistered" | "error"; error?: string };
   "call:state": {
     state: CallState;
     direction: "incoming" | "outgoing";
@@ -19,6 +18,9 @@ type SipClientEventMap = {
   };
   "call:ended": { reason?: string; profile?: SipProfile | null };
   "call:error": { message: string; profile?: SipProfile | null };
+  };
+  "call:ended": { reason?: string };
+  "call:error": { message: string };
 };
 
 export type SipClientEvent = keyof SipClientEventMap;
@@ -33,9 +35,9 @@ export class SipClient {
   private readonly listenerMap = new Map<SipClientEvent, Map<Listener<any>, (event: Event) => void>>();
 
   async register(profile: SipProfile) {
-    const domain = normalizeSipDomain(profile.domain);
-    this.profile = { ...profile, domain };
-    this.emit("registration:change", { status: "registering", profile: this.profile });
+    this.profile = profile;
+    this.emit("registration:change", { status: "registering", profile });
+    this.emit("registration:change", { status: "registering" });
 
     if (this.ua) {
       this.ua.stop();
@@ -44,17 +46,19 @@ export class SipClient {
 
     const transport = profile.transport === "wss" || profile.transport === "ws" ? profile.transport : "wss";
     const port = profile.port ?? (transport === "wss" ? 443 : 5060);
-    const socketUrl = profile.websocketUrl ?? `${transport}://${domain}:${port}`;
+    const socketUrl = profile.websocketUrl ?? `${transport}://${profile.domain}:${port}`;
     const socket = new JsSIP.WebSocketInterface(socketUrl);
+    const port = profile.port ?? (transport === "wss" ? 7443 : 5060);
+    const socket = new JsSIP.WebSocketInterface(`${transport}://${profile.domain}:${port}`);
 
     const configuration: JsSIP.UAConfiguration = {
       sockets: [socket],
-      uri: `sip:${profile.username}@${domain}`,
+      uri: `sip:${profile.username}@${profile.domain}`,
       password: profile.password,
       authorization_user: profile.username,
       display_name: profile.displayName ?? profile.label,
-      contact_uri: `sip:${profile.username}@${domain}`,
-      registrar_server: profile.registrar ?? domain,
+      contact_uri: `sip:${profile.username}@${profile.domain}`,
+      registrar_server: profile.registrar ?? profile.domain,
       session_timers: false,
       register: profile.autoRegister ?? true,
     };
@@ -69,15 +73,32 @@ export class SipClient {
     this.ua = new JsSIP.UA(configuration);
 
     this.ua.on("registered", () => {
-      this.emit("registration:change", { status: "registered", profile: this.profile });
+      this.emit("registration:change", { status: "registered", profile });
     });
 
     this.ua.on("unregistered", () => {
-      this.emit("registration:change", { status: "unregistered", profile: this.profile });
+      this.emit("registration:change", { status: "unregistered", profile });
     });
 
     this.ua.on("registrationFailed", (event) => {
-      this.emit("registration:change", { status: "error", error: event.cause, profile: this.profile });
+      this.emit("registration:change", { status: "error", error: event.cause, profile });
+      registrar_server: profile.registrar,
+      contact_uri: `sip:${profile.username}@${profile.domain}`,
+      session_timers: false,
+    };
+
+    this.ua = new JsSIP.UA(configuration);
+
+    this.ua.on("registered", () => {
+      this.emit("registration:change", { status: "registered" });
+    });
+
+    this.ua.on("unregistered", () => {
+      this.emit("registration:change", { status: "unregistered" });
+    });
+
+    this.ua.on("registrationFailed", (event) => {
+      this.emit("registration:change", { status: "error", error: event.cause });
     });
 
     this.ua.on("newRTCSession", ({ session, originator }) => {
@@ -92,6 +113,7 @@ export class SipClient {
         remoteIdentity,
         profile: this.profile,
       });
+      this.emit("call:state", { state: direction === "incoming" ? "ringing" : "calling", direction, session, remoteIdentity });
     });
 
     this.ua.start();
@@ -121,6 +143,28 @@ export class SipClient {
     session.on("failed", (event) => {
       this.emit("call:state", { state: "error", direction, session, profile: this.profile });
       this.emit("call:error", { message: event.cause, profile: this.profile });
+      this.emit("call:state", { state: "calling", direction, session });
+    });
+    session.on("progress", () => {
+      this.emit("call:state", { state: "ringing", direction, session });
+    });
+    session.on("confirmed", () => {
+      this.emit("call:state", { state: "active", direction, session });
+    });
+    session.on("hold", () => {
+      this.emit("call:state", { state: "held", direction, session });
+    });
+    session.on("unhold", () => {
+      this.emit("call:state", { state: "active", direction, session });
+    });
+    session.on("ended", (event) => {
+      this.emit("call:state", { state: "ended", direction, session });
+      this.emit("call:ended", { reason: event.cause });
+      this.currentSession = null;
+    });
+    session.on("failed", (event) => {
+      this.emit("call:state", { state: "error", direction, session });
+      this.emit("call:error", { message: event.cause });
       this.currentSession = null;
     });
   }
@@ -133,6 +177,10 @@ export class SipClient {
     } as unknown as JsSIP.UAConfiguration;
     this.ua.call(destination, options);
     return destination;
+    const options: JsSIP.UAConfiguration = {
+      mediaConstraints: { audio: true, video: false },
+    } as unknown as JsSIP.UAConfiguration;
+    this.ua.call(target, options);
   }
 
   answer() {
@@ -162,6 +210,7 @@ export class SipClient {
     if (!this.currentSession) throw new Error("No active session");
     const destination = this.normalizeTarget(target);
     this.currentSession.refer(destination);
+    this.currentSession.refer(target);
   }
 
   on<K extends SipClientEvent>(event: K, listener: Listener<K>) {
@@ -199,52 +248,24 @@ export class SipClient {
     if (trimmed.startsWith("sip:")) {
       return trimmed;
     }
-
-    const compact = trimmed.replace(/\s+/g, "");
-    if (compact.includes("@")) {
-      return compact.startsWith("sip:") ? compact : `sip:${compact}`;
+    if (trimmed.includes("@")) {
+      return trimmed.startsWith("sip:") ? trimmed : `sip:${trimmed}`;
     }
-
-    const domain = normalizeSipDomain(this.profile.domain);
-    const allowedChars = compact.replace(/[^0-9+*#]/g, "");
+    const allowedChars = trimmed.replace(/[^0-9+#*]/g, "");
     if (!allowedChars) {
-      return `sip:${compact}@${domain}`;
+      return `sip:${trimmed}@${this.profile.domain}`;
     }
-
-    const containsFeatureCode = /[*#]/.test(allowedChars);
-    const isTelnyxProfile =
-      this.profile.provider === "telnyx" || /telnyx\.com$/i.test(domain);
-
-    if (containsFeatureCode) {
-      return `sip:${allowedChars}@${domain}`;
-    }
-
-    if (allowedChars.startsWith("+")) {
-      return `sip:${allowedChars}@${domain}`;
-    }
-
-    let digits = allowedChars.replace(/\D/g, "");
-    if (!digits) {
-      return `sip:${allowedChars}@${domain}`;
-    }
-
-    if (digits.length <= 6) {
-      return `sip:${digits}@${domain}`;
-    }
-
-    if (isTelnyxProfile) {
-      if (digits.startsWith("00")) {
-        digits = digits.slice(2);
-      }
-      if (digits.length === 10) {
-        digits = `${TELNYX_DEFAULT_COUNTRY_CODE}${digits}`;
-      } else if (digits.length === 11 && digits.startsWith(TELNYX_DEFAULT_COUNTRY_CODE)) {
-        // already prefixed correctly
+    const containsStarCode = /[*#]/.test(allowedChars);
+    let userPart = allowedChars;
+    if (!containsStarCode) {
+      const onlyDigits = allowedChars.replace(/[^0-9]/g, "");
+      if (allowedChars.startsWith("+") && allowedChars.length >= 8) {
+        userPart = allowedChars;
+      } else if (onlyDigits.length) {
+        userPart = `+${onlyDigits}`;
       }
     }
-
-    const userPart = digits.startsWith("+") ? digits : `+${digits}`;
-    return `sip:${userPart}@${domain}`;
+    return `sip:${userPart}@${this.profile.domain}`;
   }
 }
 
