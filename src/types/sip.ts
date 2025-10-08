@@ -8,6 +8,8 @@ export interface SipProfile {
   domain: string;
   port?: number;
   transport: SipTransport;
+  outboundProxy?: string;
+  registrar?: string;
   displayName?: string;
   voicemailNumber?: string;
   autoRegister?: boolean;

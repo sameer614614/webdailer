@@ -44,6 +44,7 @@ export class SipClient {
       password: profile.password,
       authorization_user: profile.username,
       display_name: profile.displayName ?? profile.label,
+      registrar_server: profile.registrar,
       contact_uri: `sip:${profile.username}@${profile.domain}`,
       session_timers: false,
     };
