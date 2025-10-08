@@ -20,6 +20,13 @@ export interface SipProfile {
   isPrimary?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  port?: number;
+  transport: SipTransport;
+  outboundProxy?: string;
+  registrar?: string;
+  displayName?: string;
+  voicemailNumber?: string;
+  autoRegister?: boolean;
 }
 
 export interface CallLogEntry {

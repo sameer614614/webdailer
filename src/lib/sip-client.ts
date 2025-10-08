@@ -8,6 +8,7 @@ type SipClientEventMap = {
     error?: string;
     profile?: SipProfile | null;
   };
+  "registration:change": { status: "registering" | "registered" | "unregistered" | "error"; error?: string };
   "call:state": {
     state: CallState;
     direction: "incoming" | "outgoing";
@@ -17,6 +18,9 @@ type SipClientEventMap = {
   };
   "call:ended": { reason?: string; profile?: SipProfile | null };
   "call:error": { message: string; profile?: SipProfile | null };
+  };
+  "call:ended": { reason?: string };
+  "call:error": { message: string };
 };
 
 export type SipClientEvent = keyof SipClientEventMap;
@@ -33,6 +37,7 @@ export class SipClient {
   async register(profile: SipProfile) {
     this.profile = profile;
     this.emit("registration:change", { status: "registering", profile });
+    this.emit("registration:change", { status: "registering" });
 
     if (this.ua) {
       this.ua.stop();
@@ -43,6 +48,8 @@ export class SipClient {
     const port = profile.port ?? (transport === "wss" ? 443 : 5060);
     const socketUrl = profile.websocketUrl ?? `${transport}://${profile.domain}:${port}`;
     const socket = new JsSIP.WebSocketInterface(socketUrl);
+    const port = profile.port ?? (transport === "wss" ? 7443 : 5060);
+    const socket = new JsSIP.WebSocketInterface(`${transport}://${profile.domain}:${port}`);
 
     const configuration: JsSIP.UAConfiguration = {
       sockets: [socket],
@@ -75,6 +82,23 @@ export class SipClient {
 
     this.ua.on("registrationFailed", (event) => {
       this.emit("registration:change", { status: "error", error: event.cause, profile });
+      registrar_server: profile.registrar,
+      contact_uri: `sip:${profile.username}@${profile.domain}`,
+      session_timers: false,
+    };
+
+    this.ua = new JsSIP.UA(configuration);
+
+    this.ua.on("registered", () => {
+      this.emit("registration:change", { status: "registered" });
+    });
+
+    this.ua.on("unregistered", () => {
+      this.emit("registration:change", { status: "unregistered" });
+    });
+
+    this.ua.on("registrationFailed", (event) => {
+      this.emit("registration:change", { status: "error", error: event.cause });
     });
 
     this.ua.on("newRTCSession", ({ session, originator }) => {
@@ -89,6 +113,7 @@ export class SipClient {
         remoteIdentity,
         profile: this.profile,
       });
+      this.emit("call:state", { state: direction === "incoming" ? "ringing" : "calling", direction, session, remoteIdentity });
     });
 
     this.ua.start();
@@ -118,6 +143,28 @@ export class SipClient {
     session.on("failed", (event) => {
       this.emit("call:state", { state: "error", direction, session, profile: this.profile });
       this.emit("call:error", { message: event.cause, profile: this.profile });
+      this.emit("call:state", { state: "calling", direction, session });
+    });
+    session.on("progress", () => {
+      this.emit("call:state", { state: "ringing", direction, session });
+    });
+    session.on("confirmed", () => {
+      this.emit("call:state", { state: "active", direction, session });
+    });
+    session.on("hold", () => {
+      this.emit("call:state", { state: "held", direction, session });
+    });
+    session.on("unhold", () => {
+      this.emit("call:state", { state: "active", direction, session });
+    });
+    session.on("ended", (event) => {
+      this.emit("call:state", { state: "ended", direction, session });
+      this.emit("call:ended", { reason: event.cause });
+      this.currentSession = null;
+    });
+    session.on("failed", (event) => {
+      this.emit("call:state", { state: "error", direction, session });
+      this.emit("call:error", { message: event.cause });
       this.currentSession = null;
     });
   }
@@ -130,6 +177,10 @@ export class SipClient {
     } as unknown as JsSIP.UAConfiguration;
     this.ua.call(destination, options);
     return destination;
+    const options: JsSIP.UAConfiguration = {
+      mediaConstraints: { audio: true, video: false },
+    } as unknown as JsSIP.UAConfiguration;
+    this.ua.call(target, options);
   }
 
   answer() {
@@ -159,6 +210,7 @@ export class SipClient {
     if (!this.currentSession) throw new Error("No active session");
     const destination = this.normalizeTarget(target);
     this.currentSession.refer(destination);
+    this.currentSession.refer(target);
   }
 
   on<K extends SipClientEvent>(event: K, listener: Listener<K>) {

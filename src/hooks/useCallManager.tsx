@@ -3,6 +3,10 @@ import { useCallStore } from "../store/call-store";
 import { sipClient } from "../lib/sip-client";
 import { type SipProfile, type CallState } from "../types/sip";
 import { useSipEvents } from "./useSipEvents";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallStore } from "../store/call-store";
+import { sipClient } from "../lib/sip-client";
+import { type SipProfile, type CallState } from "../types/sip";
 
 interface CallContextValue {
   status: CallState;
@@ -48,6 +52,9 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
       error?: string;
       profile?: SipProfile | null;
     }) => {
+
+  useEffect(() => {
+    const handleRegistration = (event: { status: "registering" | "registered" | "unregistered" | "error"; error?: string }) => {
       if (event.status === "registered") {
         setRegistration("registered");
         setStatus("registered");
@@ -118,6 +125,16 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
       }).catch(console.error);
     };
 
+    const handleCallState = (event: { state: CallState; direction: "incoming" | "outgoing"; remoteIdentity?: string }) => {
+      setStatus(event.state);
+      setDirection(event.direction);
+      setRemoteIdentity(event.remoteIdentity);
+    };
+
+    const handleCallError = (event: { message: string }) => {
+      setError(event.message);
+    };
+
     sipClient.on("registration:change", handleRegistration);
     sipClient.on("call:state", handleCallState);
     sipClient.on("call:error", handleCallError);
@@ -128,6 +145,7 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
       sipClient.off("call:error", handleCallError as never);
     };
   }, [recordEvent, setDirection, setError, setRemoteIdentity, setStatus]);
+  }, [setDirection, setError, setRemoteIdentity, setStatus]);
 
   const value = useMemo<CallContextValue>(() => ({
     status,
@@ -151,6 +169,7 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
         profileId: activeProfile.id,
         createdAt: new Date().toISOString(),
       }).catch(console.error);
+      await sipClient.call(target);
     },
     answerCall: () => {
       sipClient.answer();
@@ -182,6 +201,7 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
     status,
     toggleMuted,
   ]);
+  }), [activeProfile, direction, error, muted, registration, remoteIdentity, setActiveProfile, status, toggleMuted]);
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;
 };
