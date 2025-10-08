@@ -19,6 +19,10 @@ service cloud.firestore {
       match /callLogs/{logId} {
         allow read, write: if isOwner(userId);
       }
+
+      match /events/{eventId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

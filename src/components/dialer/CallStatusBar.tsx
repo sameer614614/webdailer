@@ -51,6 +51,7 @@ export const CallStatusBar = ({ profiles, activeProfile, registration, callStatu
               {profiles.map((profile) => (
                 <option key={profile.id} value={profile.id}>
                   {profile.label}
+                  {profile.isPrimary ? " (Primary)" : ""}
                 </option>
               ))}
             </select>

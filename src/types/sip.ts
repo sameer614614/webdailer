@@ -1,11 +1,25 @@
 export type SipTransport = "udp" | "tcp" | "tls" | "ws" | "wss";
 
+export type SipProvider = "telnyx" | "custom";
+
 export interface SipProfile {
   id: string;
   label: string;
   username: string;
   password: string;
   domain: string;
+  transport: SipTransport;
+  port?: number;
+  displayName?: string;
+  voicemailNumber?: string;
+  autoRegister?: boolean;
+  provider: SipProvider;
+  websocketUrl?: string;
+  registrar?: string;
+  outboundProxy?: string;
+  isPrimary?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
   port?: number;
   transport: SipTransport;
   outboundProxy?: string;
@@ -25,6 +39,16 @@ export interface CallLogEntry {
   status: "answered" | "missed" | "declined" | "failed";
   recordingUrl?: string;
   notes?: string;
+}
+
+export interface SipEventLog {
+  id: string;
+  profileId?: string;
+  type: "registration" | "call";
+  level: "info" | "warning" | "error";
+  message: string;
+  context?: string;
+  createdAt: string;
 }
 
 export type CallState =
