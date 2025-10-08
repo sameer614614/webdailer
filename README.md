@@ -103,6 +103,7 @@ firebase deploy --only firestore:rules,database:rules
 ```
 
 Adjust the rules if you introduce additional collections or Realtime Database paths.
+Ensure you configure Firestore and Realtime Database rules to restrict access to authenticated users. Sample rules are outside the scope of this repository and should be customized for your deployment.
 
 ## Deployment
 

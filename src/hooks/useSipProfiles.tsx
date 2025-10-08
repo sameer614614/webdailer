@@ -14,6 +14,8 @@ const sipProfileSchema = z.object({
   domain: z.string().min(1),
   port: z.number().optional(),
   transport: z.enum(["udp", "tcp", "tls", "ws", "wss"]),
+  outboundProxy: z.string().optional(),
+  registrar: z.string().optional(),
   displayName: z.string().optional(),
   voicemailNumber: z.string().optional(),
   autoRegister: z.boolean().optional(),

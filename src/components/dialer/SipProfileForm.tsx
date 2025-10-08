@@ -19,6 +19,8 @@ export const SipProfileForm = ({ onSubmit, submitting }: SipProfileFormProps) =>
     domain: "",
     transport: "wss",
     port: undefined,
+    outboundProxy: "",
+    registrar: "",
     displayName: "",
     voicemailNumber: "",
     autoRegister: true,
@@ -114,6 +116,24 @@ export const SipProfileForm = ({ onSubmit, submitting }: SipProfileFormProps) =>
               </option>
             ))}
           </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="registrar">Registrar</Label>
+          <Input
+            id="registrar"
+            value={formState.registrar ?? ""}
+            onChange={handleChange("registrar")}
+            placeholder="sip:registrar.example.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="outboundProxy">Outbound proxy</Label>
+          <Input
+            id="outboundProxy"
+            value={formState.outboundProxy ?? ""}
+            onChange={handleChange("outboundProxy")}
+            placeholder="wss://proxy.example.com"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="voicemailNumber">Voicemail number</Label>
