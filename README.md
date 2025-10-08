@@ -11,6 +11,10 @@ A modern web-based multi-SIP dialer built with Vite, React, TypeScript, Tailwind
 - Call history persisted to Firestore
 - Profile-level activity stream for registration and call errors
 - Primary profile selection that persists across sessions
+- Firestore-backed SIP profile management with validation
+- Real-time presence tracking with Firebase Realtime Database
+- JsSIP-based WebRTC calling with status feedback and call controls
+- Call history persisted to Firestore
 - Responsive UI using Tailwind CSS with shadcn-inspired components
 
 ## Getting started
@@ -115,6 +119,8 @@ Adjust the rules if you introduce additional collections or Realtime Database pa
 Telnyx agents only need to supply their SIP username, password, and domain. The app automatically fills the secure WebSocket URL, transport, registrar, and default port (`wss://sip.telnyx.com:443`). Toggle the advanced overrides if you need to customise WSS, transport, registrar, or outbound proxy details for non-Telnyx providers.
 
 Mark any profile as **Primary** so it auto-registers on login and becomes the default choice in the header selector. Profile labels must be unique; edit or delete entries directly from the dashboard list.
+Adjust the rules if you introduce additional collections or Realtime Database paths.
+Ensure you configure Firestore and Realtime Database rules to restrict access to authenticated users. Sample rules are outside the scope of this repository and should be customized for your deployment.
 
 ## Deployment
 

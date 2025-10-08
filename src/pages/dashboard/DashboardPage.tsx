@@ -18,6 +18,8 @@ export const DashboardPage = () => {
   const { profiles, loading: profilesLoading, addProfile, updateProfile, removeProfile, setPrimaryProfile } = useSipProfiles();
   const { logs, appendLog } = useCallHistory();
   const { events } = useSipEvents();
+  const { profiles, loading: profilesLoading, addProfile } = useSipProfiles();
+  const { logs, appendLog } = useCallHistory();
   const {
     status,
     registration,
@@ -52,6 +54,13 @@ export const DashboardPage = () => {
       setSelectedProfileId(initial.id);
       registerProfile(initial).catch(console.error);
     }
+
+  useEffect(() => {
+    if (!profiles.length || selectedProfileId) return;
+    const auto = profiles.find((profile) => profile.autoRegister);
+    const initial = auto ?? profiles[0];
+    setSelectedProfileId(initial.id);
+    registerProfile(initial).catch(console.error);
   }, [profiles, registerProfile, selectedProfileId]);
 
   useEffect(() => {
@@ -214,6 +223,15 @@ export const DashboardPage = () => {
                           Delete
                         </Button>
                       </div>
+                      className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{profile.label}</p>
+                        <p className="text-xs text-muted-foreground">{profile.username}@{profile.domain}</p>
+                      </div>
+                      <Button size="sm" variant={selectedProfileId === profile.id ? "default" : "outline"} onClick={() => handleSelectProfile(profile.id)}>
+                        {selectedProfileId === profile.id ? "Active" : "Use"}
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -277,6 +295,11 @@ export const DashboardPage = () => {
       <Card>
         <CardHeader>
           <CardTitle>{editingProfile ? "Add another SIP Profile" : "Add SIP Profile"}</CardTitle>
+        </div>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Add SIP Profile</CardTitle>
         </CardHeader>
         <CardContent>
           <SipProfileForm onSubmit={handleAddProfile} submitting={profilesLoading} />
