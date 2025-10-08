@@ -4,6 +4,11 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { type SipProfile, type SipTransport } from "../../types/sip";
+import {
+  TELNYX_DEFAULT_DOMAIN,
+  TELNYX_DEFAULT_PORT,
+  getTelnyxWebsocketUrl,
+} from "../../constants/telnyx";
 
 interface SipProfileFormProps {
   onSubmit: (profile: Omit<SipProfile, "id">) => Promise<void>;
